@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Top Battle Spinner</title>
+  <style>
+    /* 画面全体の見た目 */
+    body {
+      margin: 0;
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    /* 説明文を左上に表示 */
+    .ui {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 10;
+      background: rgba(0, 0, 0, 0.45);
+      padding: 12px 14px;
+      border-radius: 10px;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    /* 勝敗メッセージ */
+    .message {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 20;
+      text-align: center;
+    }
+
+    .message h1 {
+      margin: 0 0 12px;
+      font-size: 42px;
+    }
+
+    .message button {
+      font-size: 18px;
+      padding: 10px 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="ui">
+    <div><strong>操作方法</strong></div>
+    <div>↑ ↓ ← → : 移動</div>
+    <div>相手を武器で押し出して、ステージ外に落とす</div>
+    <div>R : リスタート</div>
+  </div>
+
+  <div class="message" id="messageBox">
+    <h1 id="messageText">YOU WIN</h1>
+    <button onclick="resetGame()">もう一回</button>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <script>
+    /*
+      ========================================
+      1. 最初の設定
+      ========================================
+      このゲームは canvas という描画領域に、
+      円形ステージと2つのコマを描いて動かします。
+    */
+
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const messageBox = document.getElementById("messageBox");
+    const messageText = document.getElementById("messageText");
+
+    // 画面サイズをウィンドウに合わせる関数
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+
+    /*
+      ========================================
+      2. キー入力の管理
+      ========================================
+      矢印キーが押されているかどうかを記録します。
+    */
+    const keys = {};
+
+    window.addEventListener("keydown", (e) => {
+      keys[e.key] = true;
+
+      // 矢印キーを押したときにページがスクロールしないようにする
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+        e.preventDefault();
+      }
+
+      // Rキーでリスタート
+      if (e.key === "r" || e.key === "R") {
+        resetGame();
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      keys[e.key] = false;
+    });
+
+    /*
+      ========================================
+      3. ステージの設定
+      ========================================
+      円形のステージです。
+      画面中央に置き、半径を決めます。
+    */
+    const stage = {
+      get x() {
+        return canvas.width / 2;
+      },
+      get y() {
+        return canvas.height / 2;
+      },
+      get radius() {
+        // 画面に応じて大きさを変える
+        return Math.min(canvas.width, canvas.height) * 0.34;
+      }
+    };
+
+    /*
+      ========================================
+      4. コマを作る関数
+      ========================================
+      プレイヤー用、CPU用の両方で使います。
+    */
+    function createSpinner(options) {
+      return {
+        x: options.x,
+        y: options.y,
+        vx: 0, // x方向の速さ
+        vy: 0, // y方向の速さ
+        radius: options.radius || 24,
+        color: options.color || "skyblue",
+        weaponLength: options.weaponLength || 26,
+        weaponWidth: options.weaponWidth || 10,
+        angle: 0,              // コマ本体の回転角度
+        spinSpeed: options.spinSpeed || 0.22, // 常時回転する速さ
+        movePower: options.movePower || 0.28, // 移動入力時の加速
+        friction: options.friction || 0.985,  // 少しずつ減速
+        maxSpeed: options.maxSpeed || 5.0,
+        isCPU: options.isCPU || false,
+        hitCooldown: 0,        // 連続ヒットしすぎないようにする時間
+        name: options.name || "spinner"
+      };
+    }
+
+    let player, cpu, gameOver;
+
+    /*
+      ========================================
+      5. ゲームの初期化
+      ========================================
+      プレイヤーとCPUを初期位置に置きます。
+    */
+    function resetGame() {
+      player = createSpinner({
+        x: stage.x - 120,
+        y: stage.y,
+        color: "#4da6ff",
+        name: "player"
+      });
+
+      cpu = createSpinner({
+        x: stage.x + 120,
+        y: stage.y,
+        color: "#ff6b6b",
+        isCPU: true,
+        name: "cpu"
+      });
+
+      gameOver = false;
+      messageBox.style.display = "none";
+    }
+
+    resetGame();
+
+    /*
+      ========================================
+      6. 補助関数
+      ========================================
+      よく使う計算をまとめます。
+    */
+
+    // 値を最小〜最大の範囲に収める
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    // 2点間の距離
+    function distance(ax, ay, bx, by) {
+      return Math.hypot(bx - ax, by - ay);
+    }
+
+    // ベクトルの長さを制限する
+    function limitSpeed(obj) {
+      const speed = Math.hypot(obj.vx, obj.vy);
+      if (speed > obj.maxSpeed) {
+        const rate = obj.maxSpeed / speed;
+        obj.vx *= rate;
+        obj.vy *= rate;
+      }
+    }
+
+    /*
+      ========================================
+      7. 武器の先端位置を取得
+      ========================================
+      コマは回転していて、武器が1つ付いています。
+      武器の「当たり判定」に使う点を計算します。
+    */
+    function getWeaponTip(spinner) {
+      // 武器はコマの中心から外側へ伸びている
+      const lengthFromCenter = spinner.radius + spinner.weaponLength;
+
+      return {
+        x: spinner.x + Math.cos(spinner.angle) * lengthFromCenter,
+        y: spinner.y + Math.sin(spinner.angle) * lengthFromCenter
+      };
+    }
+
+    /*
+      ========================================
+      8. プレイヤーの操作
+      ========================================
+      矢印キーで少しずつ加速します。
+    */
+    function updatePlayer(spinner) {
+      if (keys["ArrowUp"]) spinner.vy -= spinner.movePower;
+      if (keys["ArrowDown"]) spinner.vy += spinner.movePower;
+      if (keys["ArrowLeft"]) spinner.vx -= spinner.movePower;
+      if (keys["ArrowRight"]) spinner.vx += spinner.movePower;
+    }
+
+    /*
+      ========================================
+      9. CPUの簡単な動き
+      ========================================
+      かなりシンプルに、プレイヤーの方向へ少しずつ進みます。
+    */
+    function updateCPU(spinner, target) {
+      const dx = target.x - spinner.x;
+      const dy = target.y - spinner.y;
+      const d = Math.hypot(dx, dy) || 1;
+
+      // プレイヤーへ向かって加速
+      spinner.vx += (dx / d) * spinner.movePower * 0.82;
+      spinner.vy += (dy / d) * spinner.movePower * 0.82;
+
+      // ときどき少しだけ横方向にズレるような動き
+      spinner.vx += Math.sin(Date.now() * 0.003) * 0.02;
+      spinner.vy += Math.cos(Date.now() * 0.003) * 0.02;
+    }
+
+    /*
+      ========================================
+      10. 物理更新
+      ========================================
+      速度を位置に反映し、摩擦で少し減速します。
+      回転角度も毎フレーム進めます。
+    */
+    function updateSpinner(spinner) {
+      spinner.x += spinner.vx;
+      spinner.y += spinner.vy;
+
+      spinner.vx *= spinner.friction;
+      spinner.vy *= spinner.friction;
+
+      spinner.angle += spinner.spinSpeed;
+
+      limitSpeed(spinner);
+
+      if (spinner.hitCooldown > 0) {
+        spinner.hitCooldown--;
+      }
+    }
+
+    /*
+      ========================================
+      11. コマ同士の本体接触
+      ========================================
+      本体が重なったら少し押し戻します。
+      これがないと、めり込みやすくなります。
+    */
+    function resolveBodyCollision(a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.hypot(dx, dy);
+      const minDist = a.radius + b.radius;
+
+      if (d > 0 && d < minDist) {
+        const overlap = minDist - d;
+        const nx = dx / d;
+        const ny = dy / d;
+
+        // 半分ずつ離す
+        a.x -= nx * overlap * 0.5;
+        a.y -= ny * overlap * 0.5;
+        b.x += nx * overlap * 0.5;
+        b.y += ny * overlap * 0.5;
+
+        // 軽く反発させる
+        a.vx -= nx * 0.15;
+        a.vy -= ny * 0.15;
+        b.vx += nx * 0.15;
+        b.vy += ny * 0.15;
+      }
+    }
+
+    /*
+      ========================================
+      12. 武器ヒット判定
+      ========================================
+      武器の先端が相手本体に近ければヒットとみなします。
+      ヒットすると相手が少し吹き飛びます。
+    */
+    function handleWeaponHit(attacker, defender) {
+      if (attacker.hitCooldown > 0) return;
+
+      const tip = getWeaponTip(attacker);
+      const d = distance(tip.x, tip.y, defender.x, defender.y);
+
+      // 武器先端が相手の円に入ったらヒット
+      if (d < defender.radius + attacker.weaponWidth) {
+        const dx = defender.x - attacker.x;
+        const dy = defender.y - attacker.y;
+        const len = Math.hypot(dx, dy) || 1;
+
+        // 吹き飛ばしの方向
+        const nx = dx / len;
+        const ny = dy / len;
+
+        // 相手を押し出す
+        defender.vx += nx * 2.2;
+        defender.vy += ny * 2.2;
+
+        // 自分も少し反動を受ける
+        attacker.vx -= nx * 0.35;
+        attacker.vy -= ny * 0.35;
+
+        // 連続ヒットしすぎ防止
+        attacker.hitCooldown = 12;
+      }
+    }
+
+    /*
+      ========================================
+      13. ステージ外判定
+      ========================================
+      ステージの円から完全に外へ出たら負けです。
+    */
+    function checkRingOut(spinner) {
+      const dFromCenter = distance(spinner.x, spinner.y, stage.x, stage.y);
+      return dFromCenter > stage.radius + spinner.radius;
+    }
+
+    /*
+      ========================================
+      14. 勝敗処理
+      ========================================
+    */
+    function endGame(text) {
+      gameOver = true;
+      messageText.textContent = text;
+      messageBox.style.display = "flex";
+    }
+
+    /*
+      ========================================
+      15. 描画処理
+      ========================================
+      毎フレーム、背景→ステージ→コマの順で描きます。
+    */
+
+    function drawBackground() {
+      // 背景を塗る
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 少しグラデーションっぽい背景
+      const g = ctx.createRadialGradient(
+        stage.x, stage.y, 50,
+        stage.x, stage.y, Math.max(canvas.width, canvas.height)
+      );
+      g.addColorStop(0, "#1d1d1d");
+      g.addColorStop(1, "#090909");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawStage() {
+      // 外側のリング
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#2c2c2c";
+      ctx.fill();
+
+      // 内側の模様
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius * 0.78, 0, Math.PI * 2);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+
+      // 枠線
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = "#888";
+      ctx.stroke();
+
+      // 中央の線
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius * 0.18, 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.stroke();
+    }
+
+    function drawSpinner(spinner) {
+      ctx.save();
+      ctx.translate(spinner.x, spinner.y);
+      ctx.rotate(spinner.angle);
+
+      // 本体の影
+      ctx.beginPath();
+      ctx.arc(3, 4, spinner.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.fill();
+
+      // 本体の円
+      ctx.beginPath();
+      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
+      ctx.fillStyle = spinner.color;
+      ctx.fill();
+
+      // 外枠
+      ctx.beginPath();
+      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.stroke();
+
+      // 武器
+      // 右方向に伸びる長方形として描いて、
+      // 回転で全体を回している
+      ctx.fillStyle = "#ffd54f";
+      ctx.fillRect(
+        spinner.radius - 2,
+        -spinner.weaponWidth / 2,
+        spinner.weaponLength,
+        spinner.weaponWidth
+      );
+
+      // 武器の先端
+      ctx.beginPath();
+      ctx.arc(
+        spinner.radius + spinner.weaponLength,
+        0,
+        spinner.weaponWidth * 0.55,
+        0,
+        Math.PI * 2
+      );
+      ctx.fillStyle = "#fff1a8";
+      ctx.fill();
+
+      // 中心
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /*
+      ========================================
+      16. ゲーム更新
+      ========================================
+    */
+    function update() {
+      if (gameOver) return;
+
+      updatePlayer(player);
+      updateCPU(cpu, player);
+
+      updateSpinner(player);
+      updateSpinner(cpu);
+
+      resolveBodyCollision(player, cpu);
+
+      // 武器ヒット判定
+      handleWeaponHit(player, cpu);
+      handleWeaponHit(cpu, player);
+
+      // ステージ外に出たら負け
+      if (checkRingOut(player)) {
+        endGame("YOU LOSE");
+      } else if (checkRingOut(cpu)) {
+        endGame("YOU WIN");
+      }
+    }
+
+    /*
+      ========================================
+      17. 描画呼び出し
+      ========================================
+    */
+    function draw() {
+      drawBackground();
+      drawStage();
+      drawSpinner(player);
+      drawSpinner(cpu);
+    }
+
+    /*
+      ========================================
+      18. メインループ
+      ========================================
+      requestAnimationFrame で毎フレーム動かします。
+    */
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
