@@ -1,12 +1,9 @@
-30bfb0d Add HP system and full weapon collision detection
-83d0e26 Update index.html
-32a8520 Add files via upload
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Top Battle Spinner - Improved</title>
+  <title>Top Battle Spinner - HP Bar + Full Weapon Collision</title>
   <style>
     body {
       margin: 0;
@@ -26,6 +23,40 @@
       border-radius: 10px;
       line-height: 1.6;
       font-size: 14px;
+      min-width: 260px;
+    }
+
+    .bar-wrap {
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+
+    .bar-label {
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .bar-bg {
+      width: 220px;
+      height: 14px;
+      background: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 100%;
+      transition: width 0.08s linear;
+    }
+
+    #playerHpBar {
+      background: #4da6ff;
+    }
+
+    #cpuHpBar {
+      background: #ff6b6b;
     }
 
     .message {
@@ -62,8 +93,22 @@
   <div class="ui">
     <div><strong>操作方法</strong></div>
     <div>↑ ↓ ← → : 移動</div>
-    <div>相手を武器で押し出して、ステージ外に落とす</div>
-    <div id="hpText">HP - PLAYER: 100 / CPU: 100</div>
+    <div>武器を当てて相手を押し出す or HPを0にする</div>
+
+    <div class="bar-wrap">
+      <div class="bar-label" id="playerHpText">PLAYER HP: 100 / 100</div>
+      <div class="bar-bg">
+        <div class="bar-fill" id="playerHpBar"></div>
+      </div>
+    </div>
+
+    <div class="bar-wrap">
+      <div class="bar-label" id="cpuHpText">CPU HP: 100 / 100</div>
+      <div class="bar-bg">
+        <div class="bar-fill" id="cpuHpBar"></div>
+      </div>
+    </div>
+
     <div>R : リスタート</div>
     <div>※ 最初のキー入力で音が有効になります</div>
   </div>
@@ -86,7 +131,11 @@
 
     const messageBox = document.getElementById("messageBox");
     const messageText = document.getElementById("messageText");
-    const hpText = document.getElementById("hpText");
+
+    const playerHpText = document.getElementById("playerHpText");
+    const cpuHpText = document.getElementById("cpuHpText");
+    const playerHpBar = document.getElementById("playerHpBar");
+    const cpuHpBar = document.getElementById("cpuHpBar");
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -113,7 +162,6 @@
         resetGame();
       }
 
-      // ユーザー操作があった時点で音を有効化
       unlockAudio();
     });
 
@@ -123,7 +171,7 @@
 
     /*
       ========================================
-      3. ステージ設定
+      3. ステージ
       ========================================
     */
     const stage = {
@@ -142,8 +190,6 @@
       ========================================
       4. 効果音
       ========================================
-      外部ファイルを使わず、ブラウザ内で簡単な音を作る。
-      GitHub Pagesでもそのまま動く。
     */
     let audioContext = null;
     let audioUnlocked = false;
@@ -159,7 +205,6 @@
       }
     }
 
-    // 短い電子音を鳴らす関数
     function playBeep(freq = 440, duration = 0.06, type = "square", volume = 0.03) {
       if (!audioUnlocked || !audioContext) return;
 
@@ -198,9 +243,8 @@
 
     /*
       ========================================
-      5. エフェクト用の粒
+      5. ヒットエフェクト
       ========================================
-      ヒットした場所に小さな火花を出す。
     */
     const particles = [];
 
@@ -221,3 +265,518 @@
         });
       }
     }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.97;
+        p.vy *= 0.97;
+        p.life--;
+
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        const alpha = p.life / p.maxLife;
+        ctx.globalAlpha = alpha;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    /*
+      ========================================
+      6. コマ生成
+      ========================================
+    */
+    function createSpinner(options) {
+      return {
+        x: options.x,
+        y: options.y,
+        vx: 0,
+        vy: 0,
+        radius: options.radius || 24,
+        color: options.color || "skyblue",
+        weaponLength: options.weaponLength || 26,
+        weaponWidth: options.weaponWidth || 10,
+        angle: 0,
+        spinSpeed: options.spinSpeed || 0.22,
+        movePower: options.movePower || 0.28,
+        friction: options.friction || 0.985,
+        maxSpeed: options.maxSpeed || 5.0,
+        isCPU: options.isCPU || false,
+        hitCooldown: 0,
+        hp: options.hp || 100,
+        maxHp: options.maxHp || 100,
+        name: options.name || "spinner"
+      };
+    }
+
+    let player, cpu, gameOver;
+
+    /*
+      ========================================
+      7. 初期化
+      ========================================
+    */
+    function resetGame() {
+      player = createSpinner({
+        x: stage.x - 120,
+        y: stage.y,
+        color: "#4da6ff",
+        name: "player",
+        movePower: 0.30,
+        maxSpeed: 5.3,
+        spinSpeed: 0.24,
+        hp: 100,
+        maxHp: 100
+      });
+
+      cpu = createSpinner({
+        x: stage.x + 120,
+        y: stage.y,
+        color: "#ff6b6b",
+        isCPU: true,
+        name: "cpu",
+        movePower: 0.31,
+        maxSpeed: 5.5,
+        spinSpeed: 0.26,
+        hp: 100,
+        maxHp: 100
+      });
+
+      particles.length = 0;
+      gameOver = false;
+      messageBox.style.display = "none";
+      updateHpUI();
+    }
+
+    resetGame();
+
+    /*
+      ========================================
+      8. 補助関数
+      ========================================
+    */
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function distance(ax, ay, bx, by) {
+      return Math.hypot(bx - ax, by - ay);
+    }
+
+    function limitSpeed(obj) {
+      const speed = Math.hypot(obj.vx, obj.vy);
+      if (speed > obj.maxSpeed) {
+        const rate = obj.maxSpeed / speed;
+        obj.vx *= rate;
+        obj.vy *= rate;
+      }
+    }
+
+    function getWeaponTip(spinner) {
+      const lengthFromCenter = spinner.radius + spinner.weaponLength;
+      return {
+        x: spinner.x + Math.cos(spinner.angle) * lengthFromCenter,
+        y: spinner.y + Math.sin(spinner.angle) * lengthFromCenter
+      };
+    }
+
+    /*
+      武器全体の始点と終点を返す。
+      これで「先端だけ」ではなく「棒全体」に当たり判定を持たせる。
+    */
+    function getWeaponSegment(spinner) {
+      const startDist = spinner.radius - 2;
+      const endDist = spinner.radius + spinner.weaponLength;
+
+      return {
+        x1: spinner.x + Math.cos(spinner.angle) * startDist,
+        y1: spinner.y + Math.sin(spinner.angle) * startDist,
+        x2: spinner.x + Math.cos(spinner.angle) * endDist,
+        y2: spinner.y + Math.sin(spinner.angle) * endDist
+      };
+    }
+
+    /*
+      点Pと線分ABの最短距離を求める。
+      武器全体と相手本体の距離判定に使う。
+    */
+    function pointToSegmentDistance(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+
+      if (dx === 0 && dy === 0) {
+        return Math.hypot(px - x1, py - y1);
+      }
+
+      const t = clamp(
+        ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy),
+        0,
+        1
+      );
+
+      const closestX = x1 + dx * t;
+      const closestY = y1 + dy * t;
+
+      return Math.hypot(px - closestX, py - closestY);
+    }
+
+    function updateHpUI() {
+      const playerRatio = (player.hp / player.maxHp) * 100;
+      const cpuRatio = (cpu.hp / cpu.maxHp) * 100;
+
+      playerHpText.textContent = `PLAYER HP: ${Math.ceil(player.hp)} / ${player.maxHp}`;
+      cpuHpText.textContent = `CPU HP: ${Math.ceil(cpu.hp)} / ${cpu.maxHp}`;
+
+      playerHpBar.style.width = `${playerRatio}%`;
+      cpuHpBar.style.width = `${cpuRatio}%`;
+    }
+
+    /*
+      ========================================
+      9. プレイヤー操作
+      ========================================
+    */
+    function updatePlayer(spinner) {
+      if (keys["ArrowUp"]) spinner.vy -= spinner.movePower;
+      if (keys["ArrowDown"]) spinner.vy += spinner.movePower;
+      if (keys["ArrowLeft"]) spinner.vx -= spinner.movePower;
+      if (keys["ArrowRight"]) spinner.vx += spinner.movePower;
+    }
+
+    /*
+      ========================================
+      10. CPU
+      ========================================
+    */
+    function updateCPU(spinner, target) {
+      const dx = target.x - spinner.x;
+      const dy = target.y - spinner.y;
+      const d = Math.hypot(dx, dy) || 1;
+
+      const chaseX = (dx / d) * spinner.movePower * 0.90;
+      const chaseY = (dy / d) * spinner.movePower * 0.90;
+
+      const sideX = (-dy / d) * 0.05;
+      const sideY = (dx / d) * 0.05;
+
+      const centerDx = stage.x - spinner.x;
+      const centerDy = stage.y - spinner.y;
+      const centerDist = Math.hypot(centerDx, centerDy) || 1;
+
+      let recoverX = 0;
+      let recoverY = 0;
+
+      if (centerDist > stage.radius * 0.72) {
+        recoverX = (centerDx / centerDist) * 0.18;
+        recoverY = (centerDy / centerDist) * 0.18;
+      }
+
+      spinner.vx += chaseX + sideX + recoverX;
+      spinner.vy += chaseY + sideY + recoverY;
+    }
+
+    /*
+      ========================================
+      11. コマ更新
+      ========================================
+    */
+    function updateSpinner(spinner) {
+      spinner.x += spinner.vx;
+      spinner.y += spinner.vy;
+
+      spinner.vx *= spinner.friction;
+      spinner.vy *= spinner.friction;
+
+      spinner.angle += spinner.spinSpeed;
+
+      limitSpeed(spinner);
+
+      if (spinner.hitCooldown > 0) {
+        spinner.hitCooldown--;
+      }
+    }
+
+    /*
+      ========================================
+      12. 本体同士の接触
+      ========================================
+    */
+    function resolveBodyCollision(a, b) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.hypot(dx, dy);
+      const minDist = a.radius + b.radius;
+
+      if (d > 0 && d < minDist) {
+        const overlap = minDist - d;
+        const nx = dx / d;
+        const ny = dy / d;
+
+        a.x -= nx * overlap * 0.5;
+        a.y -= ny * overlap * 0.5;
+        b.x += nx * overlap * 0.5;
+        b.y += ny * overlap * 0.5;
+
+        a.vx -= nx * 0.15;
+        a.vy -= ny * 0.15;
+        b.vx += nx * 0.15;
+        b.vy += ny * 0.15;
+      }
+    }
+
+    /*
+      ========================================
+      13. 武器ヒット処理
+      ========================================
+      今回のポイント:
+      - 先端だけでなく武器全体に当たり判定
+      - 当たったらHPを減らす
+      - 吹き飛ばす
+    */
+    function handleWeaponHit(attacker, defender) {
+      if (attacker.hitCooldown > 0 || gameOver) return;
+
+      const segment = getWeaponSegment(attacker);
+
+      // 武器全体（線分）と相手の円の距離を調べる
+      const distToWeapon = pointToSegmentDistance(
+        defender.x,
+        defender.y,
+        segment.x1,
+        segment.y1,
+        segment.x2,
+        segment.y2
+      );
+
+      // 武器の太さも当たり判定に含める
+      if (distToWeapon < defender.radius + attacker.weaponWidth * 0.65) {
+        const dx = defender.x - attacker.x;
+        const dy = defender.y - attacker.y;
+        const len = Math.hypot(dx, dy) || 1;
+
+        const nx = dx / len;
+        const ny = dy / len;
+
+        // 吹き飛ばし
+        defender.vx += nx * 2.3;
+        defender.vy += ny * 2.3;
+
+        // 反動
+        attacker.vx -= nx * 0.35;
+        attacker.vy -= ny * 0.35;
+
+        // HPダメージ
+        defender.hp -= 8;
+        defender.hp = clamp(defender.hp, 0, defender.maxHp);
+
+        attacker.hitCooldown = 10;
+
+        // エフェクト位置は武器の中間あたりにする
+        const hitX = (segment.x1 + segment.x2) / 2;
+        const hitY = (segment.y1 + segment.y2) / 2;
+
+        spawnHitEffect(hitX, hitY, "#ffd54f");
+        playHitSound();
+        updateHpUI();
+
+        // HPが0なら負け
+        if (defender.hp <= 0) {
+          if (defender === cpu) {
+            endGame("YOU WIN");
+          } else {
+            endGame("YOU LOSE");
+          }
+        }
+      }
+    }
+
+    /*
+      ========================================
+      14. リングアウト判定
+      ========================================
+    */
+    function checkRingOut(spinner) {
+      const dFromCenter = distance(spinner.x, spinner.y, stage.x, stage.y);
+      return dFromCenter > stage.radius + spinner.radius;
+    }
+
+    /*
+      ========================================
+      15. 勝敗
+      ========================================
+    */
+    function endGame(text) {
+      if (gameOver) return;
+
+      gameOver = true;
+      messageText.textContent = text;
+      messageBox.style.display = "flex";
+
+      if (text === "YOU WIN") {
+        playWinSound();
+      } else {
+        playLoseSound();
+      }
+    }
+
+    /*
+      ========================================
+      16. 描画
+      ========================================
+    */
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const g = ctx.createRadialGradient(
+        stage.x, stage.y, 50,
+        stage.x, stage.y, Math.max(canvas.width, canvas.height)
+      );
+      g.addColorStop(0, "#1d1d1d");
+      g.addColorStop(1, "#090909");
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawStage() {
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "#2c2c2c";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius * 0.78, 0, Math.PI * 2);
+      ctx.fillStyle = "#222";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = "#888";
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius * 0.18, 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.stroke();
+    }
+
+    function drawSpinner(spinner) {
+      ctx.save();
+      ctx.translate(spinner.x, spinner.y);
+      ctx.rotate(spinner.angle);
+
+      ctx.beginPath();
+      ctx.arc(3, 4, spinner.radius, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
+      ctx.fillStyle = spinner.color;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffd54f";
+      ctx.fillRect(
+        spinner.radius - 2,
+        -spinner.weaponWidth / 2,
+        spinner.weaponLength,
+        spinner.weaponWidth
+      );
+
+      ctx.beginPath();
+      ctx.arc(
+        spinner.radius + spinner.weaponLength,
+        0,
+        spinner.weaponWidth * 0.55,
+        0,
+        Math.PI * 2
+      );
+      ctx.fillStyle = "#fff1a8";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    /*
+      ========================================
+      17. 更新
+      ========================================
+    */
+    function update() {
+      if (gameOver) return;
+
+      updatePlayer(player);
+      updateCPU(cpu, player);
+
+      updateSpinner(player);
+      updateSpinner(cpu);
+
+      resolveBodyCollision(player, cpu);
+
+      handleWeaponHit(player, cpu);
+      handleWeaponHit(cpu, player);
+
+      updateParticles();
+
+      // リングアウトでも即敗北
+      if (checkRingOut(player)) {
+        endGame("YOU LOSE");
+      } else if (checkRingOut(cpu)) {
+        endGame("YOU WIN");
+      }
+    }
+
+    /*
+      ========================================
+      18. 描画呼び出し
+      ========================================
+    */
+    function draw() {
+      drawBackground();
+      drawStage();
+      drawSpinner(player);
+      drawSpinner(cpu);
+      drawParticles();
+    }
+
+    /*
+      ========================================
+      19. メインループ
+      ========================================
+    */
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+  </script>
+</body>
+</html>
