@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Top Battle Spinner - Weapon Hit Fix</title>
+  <title>Shape Battle Arena</title>
   <style>
     body {
       margin: 0;
@@ -23,7 +23,7 @@
       border-radius: 12px;
       line-height: 1.6;
       font-size: 14px;
-      min-width: 280px;
+      min-width: 300px;
     }
 
     .bar-wrap {
@@ -94,9 +94,9 @@
     <div><strong>操作方法</strong></div>
     <div>↑ ↓ ← → : 移動</div>
     <div>R : リスタート</div>
-    <div>武器を当てて相手を弾く / HPを削る</div>
-    <div>プレイヤー武器: <strong>blade</strong></div>
-    <div>CPU武器: <strong>spear</strong></div>
+    <div>相手に体当たりしてHPを削る / 外に落とす</div>
+    <div>プレイヤー形状: <strong>星型</strong></div>
+    <div>CPU形状: <strong>ひし形</strong></div>
 
     <div class="bar-wrap">
       <div class="bar-label" id="playerHpText">PLAYER HP: 100 / 100</div>
@@ -227,7 +227,7 @@
 
     function playHitSound() {
       playBeep(220, 0.04, "sawtooth", 0.04);
-      setTimeout(() => playBeep(170, 0.04, "square", 0.03), 15);
+      setTimeout(() => playBeep(180, 0.04, "square", 0.03), 15);
     }
 
     function playWinSound() {
@@ -244,7 +244,7 @@
 
     /*
       ========================================
-      5. エフェクト
+      5. ヒットエフェクト
       ========================================
     */
     const particles = [];
@@ -296,30 +296,35 @@
 
     /*
       ========================================
-      6. 武器タイプ
+      6. 形状ごとの設定
       ========================================
+      shapeType を変えると、
+      見た目・攻撃力・弾き飛ばし力が変わる
     */
-    const WEAPON_TYPES = {
-      blade: {
-        length: 28,
-        width: 10,
+    const SHAPE_TYPES = {
+      triangle: {
+        damage: 10,
+        knockback: 2.7,
+        hitRadiusBonus: 2,
+        colorAccent: "#ffd54f"
+      },
+      square: {
         damage: 8,
-        knockback: 2.5,
-        color: "#ffd54f"
+        knockback: 2.3,
+        hitRadiusBonus: 5,
+        colorAccent: "#9effa1"
       },
-      hammer: {
-        length: 18,
-        width: 18,
+      star: {
         damage: 12,
-        knockback: 3.2,
-        color: "#ffb347"
+        knockback: 2.8,
+        hitRadiusBonus: 1,
+        colorAccent: "#ffe680"
       },
-      spear: {
-        length: 40,
-        width: 7,
-        damage: 7,
-        knockback: 2.2,
-        color: "#b7f0ff"
+      diamond: {
+        damage: 9,
+        knockback: 2.5,
+        hitRadiusBonus: 3,
+        colorAccent: "#b7f0ff"
       }
     };
 
@@ -329,14 +334,14 @@
       ========================================
     */
     function createSpinner(options) {
-      const weapon = WEAPON_TYPES[options.weaponType || "blade"];
+      const shape = SHAPE_TYPES[options.shapeType || "triangle"];
 
       return {
         x: options.x,
         y: options.y,
         vx: 0,
         vy: 0,
-        radius: options.radius || 26,
+        radius: options.radius || 28,
         color: options.color || "skyblue",
         angle: 0,
         spinSpeed: options.spinSpeed || 0.22,
@@ -348,12 +353,12 @@
         hp: options.hp || 100,
         maxHp: options.maxHp || 100,
         name: options.name || "spinner",
-        weaponType: options.weaponType || "blade",
-        weaponLength: weapon.length,
-        weaponWidth: weapon.width,
-        weaponDamage: weapon.damage,
-        weaponKnockback: weapon.knockback,
-        weaponColor: weapon.color
+        shapeType: options.shapeType || "triangle",
+        shapeDamage: shape.damage,
+        shapeKnockback: shape.knockback,
+        shapeHitRadiusBonus: shape.hitRadiusBonus,
+        shapeAccent: shape.colorAccent,
+        flashTimer: 0
       };
     }
 
@@ -375,7 +380,7 @@
         spinSpeed: 0.24,
         hp: 100,
         maxHp: 100,
-        weaponType: "blade"
+        shapeType: "star"
       });
 
       cpu = createSpinner({
@@ -389,7 +394,7 @@
         spinSpeed: 0.26,
         hp: 100,
         maxHp: 100,
-        weaponType: "spear"
+        shapeType: "diamond"
       });
 
       particles.length = 0;
@@ -430,28 +435,6 @@
       cpuHpText.textContent = `CPU HP: ${Math.ceil(cpu.hp)} / ${cpu.maxHp}`;
       playerHpBar.style.width = `${playerRatio}%`;
       cpuHpBar.style.width = `${cpuRatio}%`;
-    }
-
-    /*
-      武器の上に複数の当たり点を置く。
-      これで「武器に当たったのに反応しない」を減らす。
-    */
-    function getWeaponHitPoints(spinner) {
-      const points = [];
-      const count = 6;
-
-      for (let i = 0; i < count; i++) {
-        const t = i / (count - 1);
-
-        const dist = (spinner.radius - 2) + spinner.weaponLength * t;
-
-        points.push({
-          x: spinner.x + Math.cos(spinner.angle) * dist,
-          y: spinner.y + Math.sin(spinner.angle) * dist
-        });
-      }
-
-      return points;
     }
 
     /*
@@ -517,98 +500,77 @@
       if (spinner.hitCooldown > 0) {
         spinner.hitCooldown--;
       }
+
+      if (spinner.flashTimer > 0) {
+        spinner.flashTimer--;
+      }
     }
 
     /*
       ========================================
       13. 本体接触
       ========================================
+      今回は「形の見た目」は違っても、
+      判定は“本体の半径 + 形状ボーナス”で分かりやすく当てる
     */
-    function resolveBodyCollision(a, b) {
+    function handleShapeHit(a, b) {
+      if (a.hitCooldown > 0 || gameOver) return;
+
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      const d = Math.hypot(dx, dy);
-      const minDist = a.radius + b.radius;
+      const d = Math.hypot(dx, dy) || 1;
 
-      if (d > 0 && d < minDist) {
-        const overlap = minDist - d;
+      const hitRange =
+        a.radius + b.radius +
+        a.shapeHitRadiusBonus +
+        b.shapeHitRadiusBonus - 8;
+
+      if (d < hitRange) {
         const nx = dx / d;
         const ny = dy / d;
 
-        a.x -= nx * overlap * 0.5;
-        a.y -= ny * overlap * 0.5;
-        b.x += nx * overlap * 0.5;
-        b.y += ny * overlap * 0.5;
+        // 押し戻し
+        const overlap = hitRange - d;
+        a.x -= nx * overlap * 0.15;
+        a.y -= ny * overlap * 0.15;
+        b.x += nx * overlap * 0.15;
+        b.y += ny * overlap * 0.15;
 
-        a.vx -= nx * 0.15;
-        a.vy -= ny * 0.15;
-        b.vx += nx * 0.15;
-        b.vy += ny * 0.15;
-      }
-    }
+        // 弾き飛ばし
+        b.vx += nx * a.shapeKnockback;
+        b.vy += ny * a.shapeKnockback;
 
-    /*
-      ========================================
-      14. 武器ヒット
-      ========================================
-      武器の複数点のどれかが相手の円に入ったらヒット。
-      ヒットしたら相手を弾く。
-    */
-    function handleWeaponHit(attacker, defender) {
-      if (attacker.hitCooldown > 0 || gameOver) return;
+        // 攻撃側の反動
+        a.vx -= nx * 0.25;
+        a.vy -= ny * 0.25;
 
-      const hitPoints = getWeaponHitPoints(attacker);
-      let hitPoint = null;
+        // ダメージ
+        b.hp -= a.shapeDamage;
+        b.hp = clamp(b.hp, 0, b.maxHp);
 
-      for (const p of hitPoints) {
-        const d = distance(p.x, p.y, defender.x, defender.y);
+        a.hitCooldown = 10;
+        b.flashTimer = 6;
 
-        if (d < defender.radius + attacker.weaponWidth * 0.55) {
-          hitPoint = p;
-          break;
-        }
-      }
+        const hitX = (a.x + b.x) / 2;
+        const hitY = (a.y + b.y) / 2;
 
-      if (!hitPoint) return;
+        spawnHitEffect(hitX, hitY, a.shapeAccent);
+        playHitSound();
+        updateHpUI();
 
-      // 攻撃方向は「攻撃者の中心 → 相手の中心」
-      const dx = defender.x - attacker.x;
-      const dy = defender.y - attacker.y;
-      const len = Math.hypot(dx, dy) || 1;
-
-      const nx = dx / len;
-      const ny = dy / len;
-
-      // 相手をしっかり弾く
-      defender.vx += nx * attacker.weaponKnockback;
-      defender.vy += ny * attacker.weaponKnockback;
-
-      // 攻撃側に少し反動
-      attacker.vx -= nx * 0.28;
-      attacker.vy -= ny * 0.28;
-
-      // HP減少
-      defender.hp -= attacker.weaponDamage;
-      defender.hp = clamp(defender.hp, 0, defender.maxHp);
-
-      attacker.hitCooldown = 10;
-
-      spawnHitEffect(hitPoint.x, hitPoint.y, attacker.weaponColor);
-      playHitSound();
-      updateHpUI();
-
-      if (defender.hp <= 0) {
-        if (defender === cpu) {
-          endGame("YOU WIN");
-        } else {
-          endGame("YOU LOSE");
+        if (b.hp <= 0) {
+          if (b === cpu) {
+            endGame("YOU WIN");
+          } else {
+            endGame("YOU LOSE");
+          }
         }
       }
     }
 
     /*
       ========================================
-      15. リングアウト
+      14. リングアウト
       ========================================
     */
     function checkRingOut(spinner) {
@@ -618,7 +580,7 @@
 
     /*
       ========================================
-      16. 勝敗
+      15. 勝敗
       ========================================
     */
     function endGame(text) {
@@ -633,6 +595,61 @@
       } else {
         playLoseSound();
       }
+    }
+
+    /*
+      ========================================
+      16. 描画補助
+      ========================================
+    */
+    function drawTriangle(radius) {
+      ctx.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const angle = -Math.PI / 2 + i * (Math.PI * 2 / 3);
+        const x = Math.cos(angle) * radius;
+        const y = Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawSquare(radius) {
+      ctx.beginPath();
+      ctx.rect(-radius, -radius, radius * 2, radius * 2);
+      ctx.fill();
+    }
+
+    function drawDiamond(radius) {
+      ctx.beginPath();
+      ctx.moveTo(0, -radius);
+      ctx.lineTo(radius, 0);
+      ctx.lineTo(0, radius);
+      ctx.lineTo(-radius, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function drawStar(outerRadius, innerRadius, spikes = 5) {
+      let rot = -Math.PI / 2;
+      let step = Math.PI / spikes;
+
+      ctx.beginPath();
+      for (let i = 0; i < spikes; i++) {
+        let x = Math.cos(rot) * outerRadius;
+        let y = Math.sin(rot) * outerRadius;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+        rot += step;
+
+        x = Math.cos(rot) * innerRadius;
+        y = Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.closePath();
+      ctx.fill();
     }
 
     /*
@@ -677,80 +694,95 @@
       ctx.stroke();
     }
 
-    function drawWeapon(spinner) {
-      ctx.fillStyle = spinner.weaponColor;
-
-      if (spinner.weaponType === "blade") {
-        ctx.fillRect(
-          spinner.radius - 2,
-          -spinner.weaponWidth / 2,
-          spinner.weaponLength,
-          spinner.weaponWidth
-        );
-      }
-
-      if (spinner.weaponType === "hammer") {
-        ctx.fillRect(
-          spinner.radius - 2,
-          -4,
-          spinner.weaponLength - 8,
-          8
-        );
-
-        ctx.fillRect(
-          spinner.radius + spinner.weaponLength - 14,
-          -spinner.weaponWidth / 2,
-          14,
-          spinner.weaponWidth
-        );
-      }
-
-      if (spinner.weaponType === "spear") {
-        ctx.fillRect(
-          spinner.radius - 2,
-          -spinner.weaponWidth / 2,
-          spinner.weaponLength - 10,
-          spinner.weaponWidth
-        );
-
-        ctx.beginPath();
-        ctx.moveTo(spinner.radius + spinner.weaponLength - 10, -10);
-        ctx.lineTo(spinner.radius + spinner.weaponLength, 0);
-        ctx.lineTo(spinner.radius + spinner.weaponLength - 10, 10);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-
     function drawSpinner(spinner) {
       ctx.save();
       ctx.translate(spinner.x, spinner.y);
       ctx.rotate(spinner.angle);
 
-      ctx.beginPath();
-      ctx.arc(4, 5, spinner.radius, 0, Math.PI * 2);
+      // 影
+      ctx.save();
+      ctx.translate(4, 5);
       ctx.fillStyle = "rgba(0,0,0,0.28)";
-      ctx.fill();
+      drawShape(spinner, true);
+      ctx.restore();
 
-      ctx.beginPath();
-      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
-      ctx.fillStyle = spinner.color;
-      ctx.fill();
+      // 本体
+      if (spinner.flashTimer > 0) {
+        ctx.fillStyle = "#ffffff";
+      } else {
+        ctx.fillStyle = spinner.color;
+      }
+      drawShape(spinner, false);
 
-      ctx.beginPath();
-      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
-      ctx.lineWidth = 4;
+      // 枠
       ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.stroke();
+      ctx.lineWidth = 4;
+      drawShapeStroke(spinner);
 
-      drawWeapon(spinner);
-
+      // 中央
       ctx.beginPath();
       ctx.arc(0, 0, 8, 0, Math.PI * 2);
       ctx.fillStyle = "#ffffff";
       ctx.fill();
 
       ctx.restore();
+    }
+
+    function drawShape(spinner) {
+      if (spinner.shapeType === "triangle") {
+        drawTriangle(spinner.radius);
+      } else if (spinner.shapeType === "square") {
+        drawSquare(spinner.radius * 0.85);
+      } else if (spinner.shapeType === "star") {
+        drawStar(spinner.radius, spinner.radius * 0.48, 5);
+      } else if (spinner.shapeType === "diamond") {
+        drawDiamond(spinner.radius);
+      }
+    }
+
+    function drawShapeStroke(spinner) {
+      if (spinner.shapeType === "triangle") {
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const angle = -Math.PI / 2 + i * (Math.PI * 2 / 3);
+          const x = Math.cos(angle) * spinner.radius;
+          const y = Math.sin(angle) * spinner.radius;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      } else if (spinner.shapeType === "square") {
+        ctx.beginPath();
+        ctx.rect(-spinner.radius * 0.85, -spinner.radius * 0.85, spinner.radius * 1.7, spinner.radius * 1.7);
+        ctx.stroke();
+      } else if (spinner.shapeType === "star") {
+        let rot = -Math.PI / 2;
+        let step = Math.PI / 5;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          let x = Math.cos(rot) * spinner.radius;
+          let y = Math.sin(rot) * spinner.radius;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          rot += step;
+
+          x = Math.cos(rot) * spinner.radius * 0.48;
+          y = Math.sin(rot) * spinner.radius * 0.48;
+          ctx.lineTo(x, y);
+          rot += step;
+        }
+        ctx.closePath();
+        ctx.stroke();
+      } else if (spinner.shapeType === "diamond") {
+        ctx.beginPath();
+        ctx.moveTo(0, -spinner.radius);
+        ctx.lineTo(spinner.radius, 0);
+        ctx.lineTo(0, spinner.radius);
+        ctx.lineTo(-spinner.radius, 0);
+        ctx.closePath();
+        ctx.stroke();
+      }
     }
 
     /*
@@ -767,10 +799,8 @@
       updateSpinner(player);
       updateSpinner(cpu);
 
-      resolveBodyCollision(player, cpu);
-
-      handleWeaponHit(player, cpu);
-      handleWeaponHit(cpu, player);
+      handleShapeHit(player, cpu);
+      handleShapeHit(cpu, player);
 
       updateParticles();
 
