@@ -3,141 +3,189 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Shape Battle Arena</title>
+  <title>Neon Spinner Arena - Spectator Mode</title>
   <style>
-    body {
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
       margin: 0;
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      overflow: hidden;
-    }
-
-    .ui {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      z-index: 10;
-      background: rgba(0, 0, 0, 0.55);
-      padding: 12px 14px;
-      border-radius: 12px;
-      line-height: 1.6;
-      font-size: 14px;
-      min-width: 300px;
-    }
-
-    .bar-wrap {
-      margin-top: 8px;
-      margin-bottom: 8px;
-    }
-
-    .bar-label {
-      font-size: 12px;
-      margin-bottom: 4px;
-    }
-
-    .bar-bg {
-      width: 220px;
-      height: 14px;
-      background: rgba(255, 255, 255, 0.18);
-      border-radius: 999px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-    }
-
-    .bar-fill {
-      height: 100%;
       width: 100%;
-      transition: width 0.08s linear;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #05070d;
+      color: white;
     }
 
-    #playerHpBar {
-      background: #4da6ff;
-    }
-
-    #cpuHpBar {
-      background: #ff6b6b;
-    }
-
-    .message {
-      position: fixed;
-      inset: 0;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      background: rgba(0, 0, 0, 0.55);
-      z-index: 20;
-      text-align: center;
-    }
-
-    .message h1 {
-      margin: 0 0 12px;
-      font-size: 42px;
-    }
-
-    .message button {
-      font-size: 18px;
-      padding: 10px 18px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
+    body {
+      position: relative;
     }
 
     canvas {
       display: block;
     }
+
+    .hud {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 12px 18px;
+      border-radius: 18px;
+      background: rgba(5, 8, 20, 0.55);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow:
+        0 0 24px rgba(0, 200, 255, 0.12),
+        inset 0 0 18px rgba(255,255,255,0.04);
+      user-select: none;
+    }
+
+    .team {
+      min-width: 170px;
+      text-align: center;
+    }
+
+    .team .name {
+      font-size: 12px;
+      opacity: 0.8;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .team .score {
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .vs {
+      font-size: 18px;
+      font-weight: 700;
+      opacity: 0.85;
+      letter-spacing: 2px;
+    }
+
+    .blue {
+      color: #67c6ff;
+      text-shadow: 0 0 18px rgba(103, 198, 255, 0.65);
+    }
+
+    .red {
+      color: #ff7474;
+      text-shadow: 0 0 18px rgba(255, 116, 116, 0.65);
+    }
+
+    .status {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(7, 11, 26, 0.6);
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      font-size: 13px;
+      letter-spacing: 0.8px;
+      opacity: 0.92;
+      user-select: none;
+    }
+
+    .result {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 25;
+    }
+
+    .resultText {
+      font-size: min(9vw, 72px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      opacity: 0;
+      transform: scale(0.9);
+      transition: 0.25s ease;
+      text-transform: uppercase;
+      text-align: center;
+      text-shadow:
+        0 0 20px rgba(255,255,255,0.12),
+        0 0 40px rgba(255,255,255,0.08);
+    }
+
+    .resultText.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .controls {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 20;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(8, 12, 26, 0.52);
+      border: 1px solid rgba(255,255,255,0.08);
+      backdrop-filter: blur(8px);
+      font-size: 12px;
+      line-height: 1.6;
+      opacity: 0.92;
+      user-select: none;
+    }
+
+    .controls b {
+      color: #dfe8ff;
+    }
   </style>
 </head>
 <body>
-  <div class="ui">
-    <div><strong>操作方法</strong></div>
-    <div>↑ ↓ ← → : 移動</div>
-    <div>R : リスタート</div>
-    <div>相手に体当たりしてHPを削る / 外に落とす</div>
-    <div>プレイヤー形状: <strong>星型</strong></div>
-    <div>CPU形状: <strong>ひし形</strong></div>
-
-    <div class="bar-wrap">
-      <div class="bar-label" id="playerHpText">PLAYER HP: 100 / 100</div>
-      <div class="bar-bg">
-        <div class="bar-fill" id="playerHpBar"></div>
-      </div>
-    </div>
-
-    <div class="bar-wrap">
-      <div class="bar-label" id="cpuHpText">CPU HP: 100 / 100</div>
-      <div class="bar-bg">
-        <div class="bar-fill" id="cpuHpBar"></div>
-      </div>
-    </div>
-
-    <div>※ 最初のキー入力で音が有効になります</div>
+  <div class="controls">
+    <div><b>観戦モード</b></div>
+    <div>R : スコア込みで再起動</div>
+    <div>M : 音のON/OFF</div>
+    <div>※ 最初のキー入力で音が有効</div>
   </div>
 
-  <div class="message" id="messageBox">
-    <h1 id="messageText">YOU WIN</h1>
-    <button onclick="resetGame()">もう一回</button>
+  <div class="hud">
+    <div class="team">
+      <div class="name blue">Blue Spinner</div>
+      <div class="score blue" id="blueScore">0</div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="team">
+      <div class="name red">Red Spinner</div>
+      <div class="score red" id="redScore">0</div>
+    </div>
+  </div>
+
+  <div class="status" id="statusText">AUTO BATTLE / NEXT ROUND CONTINUES AUTOMATICALLY</div>
+
+  <div class="result">
+    <div class="resultText" id="resultText">BLUE WIN</div>
   </div>
 
   <canvas id="game"></canvas>
 
   <script>
-    /*
-      ========================================
-      1. 基本設定
-      ========================================
-    */
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
 
-    const messageBox = document.getElementById("messageBox");
-    const messageText = document.getElementById("messageText");
-
-    const playerHpText = document.getElementById("playerHpText");
-    const cpuHpText = document.getElementById("cpuHpText");
-    const playerHpBar = document.getElementById("playerHpBar");
-    const cpuHpBar = document.getElementById("cpuHpBar");
+    const blueScoreEl = document.getElementById("blueScore");
+    const redScoreEl = document.getElementById("redScore");
+    const statusText = document.getElementById("statusText");
+    const resultText = document.getElementById("resultText");
 
     function resizeCanvas() {
       canvas.width = window.innerWidth;
@@ -146,68 +194,25 @@
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
-    /*
-      ========================================
-      2. キー入力
-      ========================================
-    */
-    const keys = {};
-
-    window.addEventListener("keydown", (e) => {
-      keys[e.key] = true;
-
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
-        e.preventDefault();
-      }
-
-      if (e.key === "r" || e.key === "R") {
-        resetGame();
-      }
-
-      unlockAudio();
-    });
-
-    window.addEventListener("keyup", (e) => {
-      keys[e.key] = false;
-    });
-
-    /*
-      ========================================
-      3. ステージ
-      ========================================
-    */
-    const stage = {
-      get x() {
-        return canvas.width / 2;
-      },
-      get y() {
-        return canvas.height / 2;
-      },
-      get radius() {
-        return Math.min(canvas.width, canvas.height) * 0.34;
-      }
-    };
-
-    /*
-      ========================================
-      4. 効果音
-      ========================================
-    */
+    // =========================
+    // Audio
+    // =========================
     let audioContext = null;
     let audioUnlocked = false;
+    let muted = false;
 
     function unlockAudio() {
       if (audioUnlocked) return;
       try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         audioUnlocked = true;
-      } catch (err) {
-        console.log("Audio not available:", err);
+      } catch (e) {
+        console.log("Audio unavailable", e);
       }
     }
 
     function playBeep(freq = 440, duration = 0.06, type = "square", volume = 0.03) {
-      if (!audioUnlocked || !audioContext) return;
+      if (!audioUnlocked || !audioContext || muted) return;
 
       const osc = audioContext.createOscillator();
       const gain = audioContext.createGain();
@@ -226,199 +231,141 @@
     }
 
     function playHitSound() {
-      playBeep(220, 0.04, "sawtooth", 0.04);
-      setTimeout(() => playBeep(180, 0.04, "square", 0.03), 15);
+      playBeep(240, 0.045, "sawtooth", 0.045);
+      setTimeout(() => playBeep(170, 0.04, "square", 0.03), 18);
     }
 
-    function playWinSound() {
-      playBeep(523, 0.08, "square", 0.04);
-      setTimeout(() => playBeep(659, 0.08, "square", 0.04), 100);
-      setTimeout(() => playBeep(784, 0.14, "square", 0.05), 200);
+    function playRoundWinSound(isBlue) {
+      if (isBlue) {
+        playBeep(523, 0.08, "square", 0.05);
+        setTimeout(() => playBeep(659, 0.08, "square", 0.05), 80);
+        setTimeout(() => playBeep(784, 0.14, "square", 0.06), 170);
+      } else {
+        playBeep(392, 0.08, "triangle", 0.05);
+        setTimeout(() => playBeep(494, 0.08, "triangle", 0.05), 80);
+        setTimeout(() => playBeep(659, 0.14, "triangle", 0.06), 170);
+      }
     }
 
-    function playLoseSound() {
-      playBeep(300, 0.08, "triangle", 0.04);
-      setTimeout(() => playBeep(220, 0.10, "triangle", 0.04), 100);
-      setTimeout(() => playBeep(160, 0.14, "triangle", 0.05), 220);
-    }
+    window.addEventListener("keydown", (e) => {
+      unlockAudio();
 
-    /*
-      ========================================
-      5. ヒットエフェクト
-      ========================================
-    */
+      if (e.key === "r" || e.key === "R") {
+        blueScore = 0;
+        redScore = 0;
+        updateScoreUI();
+        startRound();
+      }
+
+      if (e.key === "m" || e.key === "M") {
+        muted = !muted;
+        statusText.textContent = muted
+          ? "AUTO BATTLE / SOUND OFF"
+          : "AUTO BATTLE / SOUND ON";
+      }
+    });
+
+    // =========================
+    // Stage
+    // =========================
+    const stage = {
+      get x() { return canvas.width / 2; },
+      get y() { return canvas.height / 2; },
+      get radius() { return Math.min(canvas.width, canvas.height) * 0.33; }
+    };
+
+    // =========================
+    // Effects
+    // =========================
     const particles = [];
+    const shockRings = [];
+    const stars = [];
 
-    function spawnHitEffect(x, y, color = "#ffd54f") {
-      for (let i = 0; i < 14; i++) {
+    function initStars() {
+      stars.length = 0;
+      const count = Math.min(160, Math.floor((canvas.width * canvas.height) / 12000));
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height,
+          r: Math.random() * 1.8 + 0.3,
+          a: Math.random() * 0.6 + 0.15,
+          tw: Math.random() * 0.03 + 0.01
+        });
+      }
+    }
+    initStars();
+    window.addEventListener("resize", initStars);
+
+    function spawnHitEffect(x, y, color) {
+      for (let i = 0; i < 16; i++) {
         const angle = Math.random() * Math.PI * 2;
-        const speed = 1 + Math.random() * 3.2;
-
+        const speed = 1.2 + Math.random() * 4.2;
         particles.push({
-          x,
-          y,
+          x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: 20 + Math.floor(Math.random() * 12),
-          maxLife: 20 + Math.floor(Math.random() * 12),
-          size: 2 + Math.random() * 3,
+          life: 18 + Math.random() * 16,
+          maxLife: 18 + Math.random() * 16,
+          size: 1.5 + Math.random() * 3.5,
           color
+        });
+      }
+
+      shockRings.push({
+        x, y,
+        r: 8,
+        maxR: 34 + Math.random() * 18,
+        life: 18,
+        maxLife: 18,
+        color
+      });
+    }
+
+    function spawnRingOutEffect(spinner) {
+      for (let i = 0; i < 34; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2 + Math.random() * 6;
+        particles.push({
+          x: spinner.x,
+          y: spinner.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 28 + Math.random() * 18,
+          maxLife: 28 + Math.random() * 18,
+          size: 2 + Math.random() * 5,
+          color: spinner.glow
         });
       }
     }
 
-    function updateParticles() {
+    function updateEffects() {
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.x += p.vx;
         p.y += p.vy;
-        p.vx *= 0.97;
-        p.vy *= 0.97;
+        p.vx *= 0.975;
+        p.vy *= 0.975;
         p.life--;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
 
-        if (p.life <= 0) {
-          particles.splice(i, 1);
-        }
+      for (let i = shockRings.length - 1; i >= 0; i--) {
+        const s = shockRings[i];
+        s.r += (s.maxR - s.r) * 0.22;
+        s.life--;
+        if (s.life <= 0) shockRings.splice(i, 1);
       }
     }
 
-    function drawParticles() {
-      for (const p of particles) {
-        const alpha = p.life / p.maxLife;
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = p.color;
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    /*
-      ========================================
-      6. 形状ごとの設定
-      ========================================
-      shapeType を変えると、
-      見た目・攻撃力・弾き飛ばし力が変わる
-    */
-    const SHAPE_TYPES = {
-      triangle: {
-        damage: 10,
-        knockback: 2.7,
-        hitRadiusBonus: 2,
-        colorAccent: "#ffd54f"
-      },
-      square: {
-        damage: 8,
-        knockback: 2.3,
-        hitRadiusBonus: 5,
-        colorAccent: "#9effa1"
-      },
-      star: {
-        damage: 12,
-        knockback: 2.8,
-        hitRadiusBonus: 1,
-        colorAccent: "#ffe680"
-      },
-      diamond: {
-        damage: 9,
-        knockback: 2.5,
-        hitRadiusBonus: 3,
-        colorAccent: "#b7f0ff"
-      }
-    };
-
-    /*
-      ========================================
-      7. コマ生成
-      ========================================
-    */
-    function createSpinner(options) {
-      const shape = SHAPE_TYPES[options.shapeType || "triangle"];
-
-      return {
-        x: options.x,
-        y: options.y,
-        vx: 0,
-        vy: 0,
-        radius: options.radius || 28,
-        color: options.color || "skyblue",
-        angle: 0,
-        spinSpeed: options.spinSpeed || 0.22,
-        movePower: options.movePower || 0.28,
-        friction: options.friction || 0.985,
-        maxSpeed: options.maxSpeed || 5.0,
-        isCPU: options.isCPU || false,
-        hitCooldown: 0,
-        hp: options.hp || 100,
-        maxHp: options.maxHp || 100,
-        name: options.name || "spinner",
-        shapeType: options.shapeType || "triangle",
-        shapeDamage: shape.damage,
-        shapeKnockback: shape.knockback,
-        shapeHitRadiusBonus: shape.hitRadiusBonus,
-        shapeAccent: shape.colorAccent,
-        flashTimer: 0
-      };
-    }
-
-    let player, cpu, gameOver;
-
-    /*
-      ========================================
-      8. 初期化
-      ========================================
-    */
-    function resetGame() {
-      player = createSpinner({
-        x: stage.x - 120,
-        y: stage.y,
-        color: "#4da6ff",
-        name: "player",
-        movePower: 0.30,
-        maxSpeed: 5.4,
-        spinSpeed: 0.24,
-        hp: 100,
-        maxHp: 100,
-        shapeType: "star"
-      });
-
-      cpu = createSpinner({
-        x: stage.x + 120,
-        y: stage.y,
-        color: "#ff6b6b",
-        name: "cpu",
-        isCPU: true,
-        movePower: 0.31,
-        maxSpeed: 5.3,
-        spinSpeed: 0.26,
-        hp: 100,
-        maxHp: 100,
-        shapeType: "diamond"
-      });
-
-      particles.length = 0;
-      gameOver = false;
-      messageBox.style.display = "none";
-      updateHpUI();
-    }
-
-    resetGame();
-
-    /*
-      ========================================
-      9. 補助関数
-      ========================================
-    */
-    function clamp(value, min, max) {
-      return Math.max(min, Math.min(max, value));
-    }
-
+    // =========================
+    // Utilities
+    // =========================
     function distance(ax, ay, bx, by) {
       return Math.hypot(bx - ax, by - ay);
     }
 
-    function limitSpeed(obj) {
+    function clampSpeed(obj) {
       const speed = Math.hypot(obj.vx, obj.vy);
       if (speed > obj.maxSpeed) {
         const rate = obj.maxSpeed / speed;
@@ -427,65 +374,147 @@
       }
     }
 
-    function updateHpUI() {
-      const playerRatio = (player.hp / player.maxHp) * 100;
-      const cpuRatio = (cpu.hp / cpu.maxHp) * 100;
-
-      playerHpText.textContent = `PLAYER HP: ${Math.ceil(player.hp)} / ${player.maxHp}`;
-      cpuHpText.textContent = `CPU HP: ${Math.ceil(cpu.hp)} / ${cpu.maxHp}`;
-      playerHpBar.style.width = `${playerRatio}%`;
-      cpuHpBar.style.width = `${cpuRatio}%`;
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
     }
 
-    /*
-      ========================================
-      10. プレイヤー操作
-      ========================================
-    */
-    function updatePlayer(spinner) {
-      if (keys["ArrowUp"]) spinner.vy -= spinner.movePower;
-      if (keys["ArrowDown"]) spinner.vy += spinner.movePower;
-      if (keys["ArrowLeft"]) spinner.vx -= spinner.movePower;
-      if (keys["ArrowRight"]) spinner.vx += spinner.movePower;
+    function getWeaponTip(spinner) {
+      const length = spinner.radius + spinner.weaponLength;
+      return {
+        x: spinner.x + Math.cos(spinner.angle) * length,
+        y: spinner.y + Math.sin(spinner.angle) * length
+      };
     }
 
-    /*
-      ========================================
-      11. CPU
-      ========================================
-    */
-    function updateCPU(spinner, target) {
-      const dx = target.x - spinner.x;
-      const dy = target.y - spinner.y;
+    // =========================
+    // Spinners
+    // =========================
+    function createSpinner(opt) {
+      return {
+        x: opt.x,
+        y: opt.y,
+        vx: 0,
+        vy: 0,
+        radius: opt.radius ?? 26,
+        color: opt.color,
+        glow: opt.glow,
+        weaponColor: opt.weaponColor,
+        weaponLength: opt.weaponLength ?? 31,
+        weaponWidth: opt.weaponWidth ?? 10,
+        angle: Math.random() * Math.PI * 2,
+        spinSpeed: opt.spinSpeed ?? 0.25,
+        movePower: opt.movePower ?? 0.29,
+        friction: opt.friction ?? 0.988,
+        maxSpeed: opt.maxSpeed ?? 5.8,
+        hitCooldown: 0,
+        boostCooldown: 0,
+        trail: [],
+        wobble: Math.random() * Math.PI * 2,
+        name: opt.name
+      };
+    }
+
+    let blue, red;
+    let gameOver = false;
+    let roundTimer = 0;
+    let blueScore = 0;
+    let redScore = 0;
+
+    function startRound() {
+      blue = createSpinner({
+        x: stage.x - 130,
+        y: stage.y + (Math.random() * 80 - 40),
+        color: "#52b8ff",
+        glow: "rgba(82,184,255,0.95)",
+        weaponColor: "#d8f3ff",
+        name: "BLUE",
+        movePower: 0.31,
+        maxSpeed: 5.8,
+        spinSpeed: 0.27
+      });
+
+      red = createSpinner({
+        x: stage.x + 130,
+        y: stage.y + (Math.random() * 80 - 40),
+        color: "#ff5f6d",
+        glow: "rgba(255,95,109,0.95)",
+        weaponColor: "#ffe3a6",
+        name: "RED",
+        movePower: 0.315,
+        maxSpeed: 5.9,
+        spinSpeed: 0.275
+      });
+
+      particles.length = 0;
+      shockRings.length = 0;
+      gameOver = false;
+      roundTimer = 0;
+      resultText.classList.remove("show");
+      statusText.textContent = "AUTO BATTLE / NEXT ROUND CONTINUES AUTOMATICALLY";
+    }
+
+    function updateScoreUI() {
+      blueScoreEl.textContent = blueScore;
+      redScoreEl.textContent = redScore;
+    }
+
+    startRound();
+    updateScoreUI();
+
+    // =========================
+    // AI
+    // =========================
+    function updateAI(spinner, enemy) {
+      const dx = enemy.x - spinner.x;
+      const dy = enemy.y - spinner.y;
       const d = Math.hypot(dx, dy) || 1;
 
-      const chaseX = (dx / d) * spinner.movePower * 0.90;
-      const chaseY = (dy / d) * spinner.movePower * 0.90;
+      const nx = dx / d;
+      const ny = dy / d;
 
-      const sideX = (-dy / d) * 0.05;
-      const sideY = (dx / d) * 0.05;
+      const tangentX = -ny;
+      const tangentY = nx;
 
+      const distFromCenter = distance(spinner.x, spinner.y, stage.x, stage.y);
       const centerDx = stage.x - spinner.x;
       const centerDy = stage.y - spinner.y;
       const centerDist = Math.hypot(centerDx, centerDy) || 1;
 
-      let recoverX = 0;
-      let recoverY = 0;
+      let pursue = 1.0;
+      let circle = Math.sin(performance.now() * 0.0018 + spinner.wobble) * 0.12;
+      let recover = 0;
 
-      if (centerDist > stage.radius * 0.72) {
-        recoverX = (centerDx / centerDist) * 0.18;
-        recoverY = (centerDy / centerDist) * 0.18;
+      if (distFromCenter > stage.radius * 0.72) {
+        recover = 0.34;
+        pursue = 0.72;
       }
 
-      spinner.vx += chaseX + sideX + recoverX;
-      spinner.vy += chaseY + sideY + recoverY;
+      // 近距離では一気に押し込みやすくする
+      if (d < 120 && spinner.boostCooldown <= 0) {
+        spinner.vx += nx * 1.2;
+        spinner.vy += ny * 1.2;
+        spinner.boostCooldown = 55 + Math.floor(Math.random() * 25);
+      }
+
+      spinner.vx += nx * spinner.movePower * pursue;
+      spinner.vy += ny * spinner.movePower * pursue;
+
+      spinner.vx += tangentX * circle;
+      spinner.vy += tangentY * circle;
+
+      spinner.vx += (centerDx / centerDist) * recover;
+      spinner.vy += (centerDy / centerDist) * recover;
+
+      // 相手が外周なら押し出し優先
+      const enemyEdgeDist = distance(enemy.x, enemy.y, stage.x, stage.y);
+      if (enemyEdgeDist > stage.radius * 0.68) {
+        spinner.vx += nx * 0.16;
+        spinner.vy += ny * 0.16;
+      }
+
+      if (spinner.boostCooldown > 0) spinner.boostCooldown--;
     }
 
-    /*
-      ========================================
-      12. コマ更新
-      ========================================
-    */
     function updateSpinner(spinner) {
       spinner.x += spinner.vx;
       spinner.y += spinner.vy;
@@ -494,348 +523,358 @@
       spinner.vy *= spinner.friction;
 
       spinner.angle += spinner.spinSpeed;
+      clampSpeed(spinner);
 
-      limitSpeed(spinner);
+      if (spinner.hitCooldown > 0) spinner.hitCooldown--;
 
-      if (spinner.hitCooldown > 0) {
-        spinner.hitCooldown--;
-      }
-
-      if (spinner.flashTimer > 0) {
-        spinner.flashTimer--;
-      }
+      spinner.trail.push({
+        x: spinner.x,
+        y: spinner.y,
+        a: spinner.angle
+      });
+      if (spinner.trail.length > 10) spinner.trail.shift();
     }
 
-    /*
-      ========================================
-      13. 本体接触
-      ========================================
-      今回は「形の見た目」は違っても、
-      判定は“本体の半径 + 形状ボーナス”で分かりやすく当てる
-    */
-    function handleShapeHit(a, b) {
-      if (a.hitCooldown > 0 || gameOver) return;
-
+    function resolveBodyCollision(a, b) {
       const dx = b.x - a.x;
       const dy = b.y - a.y;
-      const d = Math.hypot(dx, dy) || 1;
+      const d = Math.hypot(dx, dy);
+      const minDist = a.radius + b.radius;
 
-      const hitRange =
-        a.radius + b.radius +
-        a.shapeHitRadiusBonus +
-        b.shapeHitRadiusBonus - 8;
-
-      if (d < hitRange) {
+      if (d > 0 && d < minDist) {
+        const overlap = minDist - d;
         const nx = dx / d;
         const ny = dy / d;
 
-        // 押し戻し
-        const overlap = hitRange - d;
-        a.x -= nx * overlap * 0.15;
-        a.y -= ny * overlap * 0.15;
-        b.x += nx * overlap * 0.15;
-        b.y += ny * overlap * 0.15;
+        a.x -= nx * overlap * 0.5;
+        a.y -= ny * overlap * 0.5;
+        b.x += nx * overlap * 0.5;
+        b.y += ny * overlap * 0.5;
 
-        // 弾き飛ばし
-        b.vx += nx * a.shapeKnockback;
-        b.vy += ny * a.shapeKnockback;
+        a.vx -= nx * 0.28;
+        a.vy -= ny * 0.28;
+        b.vx += nx * 0.28;
+        b.vy += ny * 0.28;
 
-        // 攻撃側の反動
-        a.vx -= nx * 0.25;
-        a.vy -= ny * 0.25;
-
-        // ダメージ
-        b.hp -= a.shapeDamage;
-        b.hp = clamp(b.hp, 0, b.maxHp);
-
-        a.hitCooldown = 10;
-        b.flashTimer = 6;
-
-        const hitX = (a.x + b.x) / 2;
-        const hitY = (a.y + b.y) / 2;
-
-        spawnHitEffect(hitX, hitY, a.shapeAccent);
+        spawnHitEffect((a.x + b.x) / 2, (a.y + b.y) / 2, "#ffffff");
         playHitSound();
-        updateHpUI();
-
-        if (b.hp <= 0) {
-          if (b === cpu) {
-            endGame("YOU WIN");
-          } else {
-            endGame("YOU LOSE");
-          }
-        }
       }
     }
 
-    /*
-      ========================================
-      14. リングアウト
-      ========================================
-    */
+    function handleWeaponHit(attacker, defender) {
+      if (attacker.hitCooldown > 0) return;
+
+      const tip = getWeaponTip(attacker);
+      const d = distance(tip.x, tip.y, defender.x, defender.y);
+
+      if (d < defender.radius + attacker.weaponWidth + 1) {
+        const dx = defender.x - attacker.x;
+        const dy = defender.y - attacker.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = dx / len;
+        const ny = dy / len;
+
+        defender.vx += nx * 3.0;
+        defender.vy += ny * 3.0;
+
+        attacker.vx -= nx * 0.42;
+        attacker.vy -= ny * 0.42;
+
+        // 回転方向の勢いも少し足す
+        defender.vx += Math.cos(attacker.angle) * 0.4;
+        defender.vy += Math.sin(attacker.angle) * 0.4;
+
+        attacker.hitCooldown = 10;
+
+        spawnHitEffect(tip.x, tip.y, attacker.glow);
+        playHitSound();
+      }
+    }
+
     function checkRingOut(spinner) {
-      const dFromCenter = distance(spinner.x, spinner.y, stage.x, stage.y);
-      return dFromCenter > stage.radius + spinner.radius;
+      const d = distance(spinner.x, spinner.y, stage.x, stage.y);
+      return d > stage.radius + spinner.radius;
     }
 
-    /*
-      ========================================
-      15. 勝敗
-      ========================================
-    */
-    function endGame(text) {
+    function endRound(winner, loser) {
       if (gameOver) return;
-
       gameOver = true;
-      messageText.textContent = text;
-      messageBox.style.display = "flex";
 
-      if (text === "YOU WIN") {
-        playWinSound();
+      spawnRingOutEffect(loser);
+
+      if (winner === blue) {
+        blueScore++;
+        resultText.textContent = "BLUE WIN";
+        resultText.style.color = "#67c6ff";
+        resultText.style.textShadow = "0 0 24px rgba(103,198,255,0.9), 0 0 60px rgba(103,198,255,0.35)";
+        playRoundWinSound(true);
       } else {
-        playLoseSound();
+        redScore++;
+        resultText.textContent = "RED WIN";
+        resultText.style.color = "#ff7b7b";
+        resultText.style.textShadow = "0 0 24px rgba(255,123,123,0.9), 0 0 60px rgba(255,123,123,0.35)";
+        playRoundWinSound(false);
       }
+
+      updateScoreUI();
+      resultText.classList.add("show");
+      statusText.textContent = "RING OUT / NEXT ROUND STARTS SOON";
     }
 
-    /*
-      ========================================
-      16. 描画補助
-      ========================================
-    */
-    function drawTriangle(radius) {
-      ctx.beginPath();
-      for (let i = 0; i < 3; i++) {
-        const angle = -Math.PI / 2 + i * (Math.PI * 2 / 3);
-        const x = Math.cos(angle) * radius;
-        const y = Math.sin(angle) * radius;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    function drawSquare(radius) {
-      ctx.beginPath();
-      ctx.rect(-radius, -radius, radius * 2, radius * 2);
-      ctx.fill();
-    }
-
-    function drawDiamond(radius) {
-      ctx.beginPath();
-      ctx.moveTo(0, -radius);
-      ctx.lineTo(radius, 0);
-      ctx.lineTo(0, radius);
-      ctx.lineTo(-radius, 0);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    function drawStar(outerRadius, innerRadius, spikes = 5) {
-      let rot = -Math.PI / 2;
-      let step = Math.PI / spikes;
-
-      ctx.beginPath();
-      for (let i = 0; i < spikes; i++) {
-        let x = Math.cos(rot) * outerRadius;
-        let y = Math.sin(rot) * outerRadius;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-        rot += step;
-
-        x = Math.cos(rot) * innerRadius;
-        y = Math.sin(rot) * innerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
-      }
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    /*
-      ========================================
-      17. 描画
-      ========================================
-    */
+    // =========================
+    // Draw
+    // =========================
     function drawBackground() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       const g = ctx.createRadialGradient(
-        stage.x, stage.y, 40,
-        stage.x, stage.y, Math.max(canvas.width, canvas.height)
+        stage.x, stage.y, 0,
+        stage.x, stage.y, Math.max(canvas.width, canvas.height) * 0.85
       );
-      g.addColorStop(0, "#2a2a2a");
-      g.addColorStop(1, "#080808");
+      g.addColorStop(0, "#0e1730");
+      g.addColorStop(0.35, "#0a0f1d");
+      g.addColorStop(0.7, "#05070d");
+      g.addColorStop(1, "#020308");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (const s of stars) {
+        s.a += s.tw;
+        const alpha = 0.18 + (Math.sin(s.a) * 0.5 + 0.5) * 0.55;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = "#b7d3ff";
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
 
     function drawStage() {
+      // Outer glow
       ctx.beginPath();
-      ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
-      ctx.fillStyle = "#404040";
+      ctx.arc(stage.x, stage.y, stage.radius + 18, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(54, 132, 255, 0.05)";
       ctx.fill();
 
-      ctx.beginPath();
-      ctx.arc(stage.x, stage.y, stage.radius * 0.82, 0, Math.PI * 2);
-      ctx.fillStyle = "#2d2d2d";
-      ctx.fill();
+      // Main arena
+      const ringGrad = ctx.createRadialGradient(
+        stage.x, stage.y, stage.radius * 0.15,
+        stage.x, stage.y, stage.radius
+      );
+      ringGrad.addColorStop(0, "#141c33");
+      ringGrad.addColorStop(0.5, "#101625");
+      ringGrad.addColorStop(1, "#0a0e17");
 
       ctx.beginPath();
       ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
-      ctx.lineWidth = 10;
-      ctx.strokeStyle = "#bdbdbd";
+      ctx.fillStyle = ringGrad;
+      ctx.fill();
+
+      // Inner circles
+      for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(stage.x, stage.y, stage.radius * (i / 4.8), 0, Math.PI * 2);
+        ctx.lineWidth = i === 4 ? 3 : 1.2;
+        ctx.strokeStyle = i === 4
+          ? "rgba(120,190,255,0.35)"
+          : "rgba(255,255,255,0.08)";
+        ctx.stroke();
+      }
+
+      // Hex-ish accent lines
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI * 2 / 6) * i + performance.now() * 0.00015;
+        const x1 = stage.x + Math.cos(a) * stage.radius * 0.22;
+        const y1 = stage.y + Math.sin(a) * stage.radius * 0.22;
+        const x2 = stage.x + Math.cos(a) * stage.radius * 0.92;
+        const y2 = stage.y + Math.sin(a) * stage.radius * 0.92;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = "rgba(120,190,255,0.08)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Edge ring
+      ctx.beginPath();
+      ctx.arc(stage.x, stage.y, stage.radius, 0, Math.PI * 2);
+      ctx.lineWidth = 8;
+      ctx.strokeStyle = "rgba(147, 203, 255, 0.55)";
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(stage.x, stage.y, stage.radius * 0.20, 0, Math.PI * 2);
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.arc(stage.x, stage.y, stage.radius - 8, 0, Math.PI * 2);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255,255,255,0.08)";
       ctx.stroke();
     }
 
+    function drawTrail(spinner) {
+      for (let i = 0; i < spinner.trail.length; i++) {
+        const t = spinner.trail[i];
+        const alpha = i / spinner.trail.length * 0.25;
+        const r = spinner.radius * (0.74 + i / spinner.trail.length * 0.22);
+
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(t.x, t.y, r, 0, Math.PI * 2);
+        ctx.fillStyle = spinner.glow;
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
     function drawSpinner(spinner) {
+      drawTrail(spinner);
+
       ctx.save();
       ctx.translate(spinner.x, spinner.y);
       ctx.rotate(spinner.angle);
 
-      // 影
-      ctx.save();
-      ctx.translate(4, 5);
-      ctx.fillStyle = "rgba(0,0,0,0.28)";
-      drawShape(spinner, true);
-      ctx.restore();
-
-      // 本体
-      if (spinner.flashTimer > 0) {
-        ctx.fillStyle = "#ffffff";
-      } else {
-        ctx.fillStyle = spinner.color;
-      }
-      drawShape(spinner, false);
-
-      // 枠
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 4;
-      drawShapeStroke(spinner);
-
-      // 中央
+      // shadow glow
       ctx.beginPath();
-      ctx.arc(0, 0, 8, 0, Math.PI * 2);
+      ctx.arc(0, 0, spinner.radius + 10, 0, Math.PI * 2);
+      ctx.fillStyle = spinner.glow.replace("0.95", "0.12");
+      ctx.fill();
+
+      // body glow
+      ctx.shadowBlur = 24;
+      ctx.shadowColor = spinner.glow;
+
+      // outer body
+      const grad = ctx.createRadialGradient(-6, -8, 4, 0, 0, spinner.radius);
+      grad.addColorStop(0, "#ffffff");
+      grad.addColorStop(0.18, spinner.color);
+      grad.addColorStop(0.7, spinner.color);
+      grad.addColorStop(1, "rgba(0,0,0,0.9)");
+
+      ctx.beginPath();
+      ctx.arc(0, 0, spinner.radius, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // ring
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = "rgba(255,255,255,0.42)";
+      ctx.stroke();
+
+      // rotating weapon arm
+      ctx.fillStyle = spinner.weaponColor;
+      ctx.fillRect(
+        spinner.radius - 2,
+        -spinner.weaponWidth / 2,
+        spinner.weaponLength,
+        spinner.weaponWidth
+      );
+
+      // weapon glow
+      ctx.beginPath();
+      ctx.arc(
+        spinner.radius + spinner.weaponLength,
+        0,
+        spinner.weaponWidth * 0.62,
+        0,
+        Math.PI * 2
+      );
       ctx.fillStyle = "#ffffff";
       ctx.fill();
 
+      // extra blade accent
+      ctx.beginPath();
+      ctx.moveTo(spinner.radius + 5, -spinner.weaponWidth * 0.9);
+      ctx.lineTo(spinner.radius + spinner.weaponLength + 8, 0);
+      ctx.lineTo(spinner.radius + 5, spinner.weaponWidth * 0.9);
+      ctx.closePath();
+      ctx.globalAlpha = 0.38;
+      ctx.fillStyle = spinner.weaponColor;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // core
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      ctx.arc(0, 0, 8.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#0b1020";
+      ctx.fill();
+
       ctx.restore();
+      ctx.shadowBlur = 0;
     }
 
-    function drawShape(spinner) {
-      if (spinner.shapeType === "triangle") {
-        drawTriangle(spinner.radius);
-      } else if (spinner.shapeType === "square") {
-        drawSquare(spinner.radius * 0.85);
-      } else if (spinner.shapeType === "star") {
-        drawStar(spinner.radius, spinner.radius * 0.48, 5);
-      } else if (spinner.shapeType === "diamond") {
-        drawDiamond(spinner.radius);
+    function drawEffects() {
+      for (const p of particles) {
+        const alpha = p.life / p.maxLife;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
       }
-    }
 
-    function drawShapeStroke(spinner) {
-      if (spinner.shapeType === "triangle") {
+      for (const s of shockRings) {
+        const alpha = s.life / s.maxLife;
+        ctx.globalAlpha = alpha * 0.7;
         ctx.beginPath();
-        for (let i = 0; i < 3; i++) {
-          const angle = -Math.PI / 2 + i * (Math.PI * 2 / 3);
-          const x = Math.cos(angle) * spinner.radius;
-          const y = Math.sin(angle) * spinner.radius;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-        ctx.stroke();
-      } else if (spinner.shapeType === "square") {
-        ctx.beginPath();
-        ctx.rect(-spinner.radius * 0.85, -spinner.radius * 0.85, spinner.radius * 1.7, spinner.radius * 1.7);
-        ctx.stroke();
-      } else if (spinner.shapeType === "star") {
-        let rot = -Math.PI / 2;
-        let step = Math.PI / 5;
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-          let x = Math.cos(rot) * spinner.radius;
-          let y = Math.sin(rot) * spinner.radius;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-          rot += step;
-
-          x = Math.cos(rot) * spinner.radius * 0.48;
-          y = Math.sin(rot) * spinner.radius * 0.48;
-          ctx.lineTo(x, y);
-          rot += step;
-        }
-        ctx.closePath();
-        ctx.stroke();
-      } else if (spinner.shapeType === "diamond") {
-        ctx.beginPath();
-        ctx.moveTo(0, -spinner.radius);
-        ctx.lineTo(spinner.radius, 0);
-        ctx.lineTo(0, spinner.radius);
-        ctx.lineTo(-spinner.radius, 0);
-        ctx.closePath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = s.color;
         ctx.stroke();
       }
+
+      ctx.globalAlpha = 1;
     }
 
-    /*
-      ========================================
-      18. 更新
-      ========================================
-    */
+    // =========================
+    // Update
+    // =========================
     function update() {
-      if (gameOver) return;
+      updateEffects();
 
-      updatePlayer(player);
-      updateCPU(cpu, player);
+      if (gameOver) {
+        roundTimer++;
+        if (roundTimer > 120) {
+          startRound();
+        }
+        return;
+      }
 
-      updateSpinner(player);
-      updateSpinner(cpu);
+      updateAI(blue, red);
+      updateAI(red, blue);
 
-      handleShapeHit(player, cpu);
-      handleShapeHit(cpu, player);
+      updateSpinner(blue);
+      updateSpinner(red);
 
-      updateParticles();
+      resolveBodyCollision(blue, red);
+      handleWeaponHit(blue, red);
+      handleWeaponHit(red, blue);
 
-      if (checkRingOut(player)) {
-        endGame("YOU LOSE");
-      } else if (checkRingOut(cpu)) {
-        endGame("YOU WIN");
+      if (checkRingOut(blue)) {
+        endRound(red, blue);
+      } else if (checkRingOut(red)) {
+        endRound(blue, red);
       }
     }
 
-    /*
-      ========================================
-      19. 描画
-      ========================================
-    */
     function draw() {
       drawBackground();
       drawStage();
-      drawSpinner(player);
-      drawSpinner(cpu);
-      drawParticles();
+      drawSpinner(blue);
+      drawSpinner(red);
+      drawEffects();
     }
 
-    /*
-      ========================================
-      20. メインループ
-      ========================================
-    */
-    function gameLoop() {
+    function loop() {
       update();
       draw();
-      requestAnimationFrame(gameLoop);
+      requestAnimationFrame(loop);
     }
 
-    gameLoop();
+    loop();
   </script>
 </body>
 </html>
